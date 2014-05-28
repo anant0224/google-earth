@@ -1,0 +1,155 @@
+<html>
+	<head>
+		<title>Sample</title>
+		<script type="text/javascript" src="https://www.google.com/jsapi"> </script>
+		<script type="text/javascript">
+			var ge, object, overlay; 
+			var prev = 10000000;
+			var changed = false;
+			google.load("earth", "1", {"other_params":"sensor=true_or_false"});
+
+			function init() {
+				google.earth.createInstance('map3d', initCB, failureCB);
+			}
+
+			function initCB(instance) {
+				ge = instance;
+				ge.getWindow().setVisibility(true); 	 
+				ge.getNavigationControl().setVisibility(ge.VISIBILITY_SHOW);
+				var la = ge.createLookAt('');
+				la.set(52.34388405, 9.76769296, 0, ge.ALTITUDE_RELATIVE_TO_GROUND, -8.541, 66.213, 20000);
+				ge.getView().setAbstractView(la);
+				
+				
+				var href = "http://localhost:59128/WebSite1/Default.aspx";
+				google.earth.fetchKml(ge, href, function(kmlObject) {
+					object = kmlObject;
+					//alert(object.getKml());	
+					show();
+				});
+				
+				overlay =
+				ge.parseKml('<?xml version="1.0" encoding="UTF-8"?>' +
+							'<kml xmlns="http://www.opengis.net/kml/2.2"' +
+							' xmlns:gx="http://www.google.com/kml/ext/2.2">' +
+							'<GroundOverlay>' +
+							'  <name>gx:LatLonQuad Example</name>' +
+							'  <Icon>' +
+							'	<href>http://localhost:59128/WebSite1/image.aspx</href>' +
+							'	<viewBoundScale>0.75</viewBoundScale>' +
+							'  </Icon>' +
+							'  <gx:LatLonQuad>' +
+							'	<coordinates>' +
+							'	  9.76685081,52.36623646 9.76503729,52.40215623 9.70631303,52.40103125 9.70817412,52.36511293' +
+							'	</coordinates>' +
+							'  </gx:LatLonQuad>' +
+							'</GroundOverlay>' +
+							'</kml>');
+				//ge.getFeatures().appendChild(overlay);
+				show2();
+				
+				google.earth.addEventListener(ge.getView(), 'viewchangebegin', function() {
+					var bounds = ge.getView().getViewportGlobeBounds();
+					var north = bounds.getNorth();
+					var south = bounds.getSouth();
+					var east = bounds.getEast();
+					var west = bounds.getWest();
+					var fork = Math.abs(north - south) + Math.abs(east - west);
+					if(changed)
+						if (fork < 100)
+							prev = 0.0001 * Math.pow(fork * 100, 0.5);
+						else
+							prev = 0.001 * Math.pow(fork * 100, 0.5);
+					//alert(prev);
+				});
+				
+				google.earth.addEventListener(ge.getView(), 'viewchangeend', function() {
+					var bounds = ge.getView().getViewportGlobeBounds();
+					var north = bounds.getNorth();
+					var south = bounds.getSouth();
+					var east = bounds.getEast();
+					var west = bounds.getWest();
+					var fork = Math.abs(north - south) + Math.abs(east - west);
+					var k;
+					if (fork < 100)
+							k = 0.0001 * Math.pow(fork * 100, 0.5);
+						else
+							k = 0.001 * Math.pow(fork * 100, 0.5);
+					document.getElementById('text').innerHTML = k;
+					
+					if(!(document.getElementById("placemarks").checked) || (Math.abs(1 - k / prev) < 0.5))
+						changed = false;
+					
+					else {
+					changed = true;
+						//ge.getFeatures().removeChild(object);
+						var subNodes = object.getFeatures().getChildNodes(); 
+						var length = subNodes.getLength(); 
+						//alert(length);
+						for(var i = 0; i < length; i++) { 
+							//alert(i);
+							var coordinates = object.getFeatures().getChildNodes().item(i).getGeometry().getGeometries().getFirstChild().getOuterBoundary().getCoordinates();
+							
+							
+							var first = coordinates.get(0);
+							var second = coordinates.get(1);
+							var third = coordinates.get(2);
+							
+							var lat = (first.getLatitude() + second.getLatitude() + third.getLatitude())/3;
+							var lng = (first.getLongitude() + second.getLongitude() + third.getLongitude())/3;
+							var alt = first.getAltitude();
+							var divider = (Math.sqrt(Math.pow(first.getLatitude() - lat, 2) + Math.pow(first.getLongitude() - lng, 2)));
+						
+							first.setLatLngAlt(lat + k * (first.getLatitude() - lat) / divider, lng + k * (first.getLongitude() - lng) / divider, alt);
+							second.setLatLngAlt(lat + k * (second.getLatitude() - lat) / divider, lng + k * (second.getLongitude() - lng) / divider, alt);
+							third.setLatLngAlt(lat + k * (third.getLatitude() - lat) / divider, lng + k * (third.getLongitude() - lng) / divider, alt);
+							
+							coordinates.set(0, first);
+							coordinates.set(1, second);
+							coordinates.set(2, third);
+
+						} 
+						//ge.getFeatures().appendChild(object);
+					}
+						
+					
+				});	
+			}
+
+			function failureCB(errorCode) {
+			}
+			
+			function show()
+				{
+					if (document.getElementById("placemarks").checked) {
+						ge.getFeatures().appendChild(object);						
+					}
+					
+					else {
+						ge.getFeatures().removeChild(object);
+					}
+				}
+				
+			function show2()
+				{
+					if (document.getElementById("intensity_map").checked) {
+						ge.getFeatures().appendChild(overlay);						
+					}
+					
+					else {
+						ge.getFeatures().removeChild(overlay);
+					}
+				}
+
+			google.setOnLoadCallback(init);
+
+		</script>
+
+	</head>
+	<body>
+		<div id="map3d" style="height: 400px; width: 600px;"></div>
+		<input type="checkbox" id="placemarks" onchange="show()">Show placemarks
+		<input type="checkbox" id="intensity_map" onchange="show2()">Show intensity map
+		<div id="text">N/A</div>
+	</body>
+</html>
